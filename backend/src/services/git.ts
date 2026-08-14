@@ -60,7 +60,32 @@ export async function gitStatus(cwd: string): Promise<CommandResult & { clean: b
   return { ...res, clean: res.success && files.length === 0, files };
 }
 
-export async function commitAndPush(cwd: string, message: string): Promise<CommandResult & { nothingToCommit?: boolean }> {
+// Inject current token into the HTTPS remote URL so git operations don't fail
+// when the token has changed or expired since the repo was cloned.
+async function refreshRemoteToken(cwd: string, token: string): Promise<void> {
+  const res = await exec(['remote', 'get-url', 'origin'], cwd);
+  if (!res.success || !res.stdout.startsWith('http')) return;
+  const authed = res.stdout.replace(/^https?:\/\/([^@]*@)?/, `https://oauth2:${token}@`);
+  await exec(['remote', 'set-url', 'origin', authed], cwd);
+}
+
+export async function forcePull(cwd: string, token?: string): Promise<CommandResult> {
+  if (token) await refreshRemoteToken(cwd, token);
+
+  const fetch = await exec(['fetch', 'origin'], cwd);
+  if (!fetch.success) return fetch;
+
+  const reset = await exec(['reset', '--hard', '@{u}'], cwd);
+  return {
+    ...reset,
+    stdout: [fetch.stdout, reset.stdout].filter(Boolean).join('\n'),
+    stderr: [fetch.stderr, reset.stderr].filter(Boolean).join('\n'),
+  };
+}
+
+export async function commitAndPush(cwd: string, message: string, token?: string): Promise<CommandResult & { nothingToCommit?: boolean }> {
+  if (token) await refreshRemoteToken(cwd, token);
+
   const status = await exec(['status', '--short'], cwd);
 
   const add = await exec(['add', '-A'], cwd);

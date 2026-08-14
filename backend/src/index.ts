@@ -105,15 +105,20 @@ app.post('/api/git/pull', async (_, res) => {
   res.json(await sealdctl.gitPull(workdir));
 });
 
+app.post('/api/git/force-pull', async (_, res) => {
+  const { workdir, gitlabToken, useSSH } = getSettings();
+  res.json(await git.forcePull(workdir, useSSH ? undefined : gitlabToken));
+});
+
 app.get('/api/git/status', async (_, res) => {
   const { workdir } = getSettings();
   res.json(await git.gitStatus(workdir));
 });
 
 app.post('/api/git/commit-push', async (req, res) => {
-  const { workdir } = getSettings();
+  const { workdir, gitlabToken, useSSH } = getSettings();
   const { message } = req.body as { message?: string };
-  res.json(await git.commitAndPush(workdir, message ?? 'seald: update secrets'));
+  res.json(await git.commitAndPush(workdir, message ?? 'seald: update secrets', useSSH ? undefined : gitlabToken));
 });
 
 // ── GitLab ────────────────────────────────────────────────────────────────────

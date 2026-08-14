@@ -3,9 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import {
   KeyRound, Eye, EyeOff, Copy, Trash2, Plus, Save,
   Unlock, Loader2, AlertTriangle, CheckCircle, XCircle,
-  RotateCcw, ChevronDown, GitBranch,
+  RotateCcw, ChevronDown, GitBranch, RefreshCw,
 } from 'lucide-react';
-import { getTree, unseal, seal, commitAndPush } from '../api/client';
+import { getTree, unseal, seal, commitAndPush, gitForcePull } from '../api/client';
 import type { SecretRow, CommandResult, TreeNode } from '../types';
 import TerminalOutput from '../components/TerminalOutput';
 
@@ -45,6 +45,8 @@ export default function SecretEditor() {
   const [showAdd, setShowAdd] = useState(false);
   const [pushing, setPushing] = useState(false);
   const [pushResult, setPushResult] = useState<(CommandResult & { nothingToCommit?: boolean }) | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<CommandResult | null>(null);
 
   useEffect(() => {
     getTree().then(d => setServices(d.parsed)).catch(() => {});
@@ -120,6 +122,20 @@ export default function SecretEditor() {
     });
   };
 
+  const syncRepo = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await gitForcePull();
+      setSyncResult(res);
+      if (res.success && svc && env) loadSecrets();
+    } catch (e: unknown) {
+      setSyncResult({ stdout: '', stderr: e instanceof Error ? e.message : String(e), code: 1, success: false });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const push = async () => {
     setPushing(true);
     setPushResult(null);
@@ -170,7 +186,37 @@ export default function SecretEditor() {
           </h1>
           <p className="text-sm text-ink-muted mt-1">Чтение и изменение секретов</p>
         </div>
+        <button
+          onClick={syncRepo}
+          disabled={syncing}
+          className="btn-ghost text-sm"
+          title="git fetch + reset --hard @{u}"
+        >
+          {syncing
+            ? <><Loader2 className="w-4 h-4 animate-spin" /> Синхронизация...</>
+            : <><RefreshCw className="w-4 h-4" /> Синхронизировать</>
+          }
+        </button>
       </div>
+
+      {/* Sync result */}
+      {syncResult && (
+        <div className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border mb-4 ${
+          syncResult.success
+            ? 'border-green-500/20 bg-green-500/5 text-green-300'
+            : 'border-red-500/20 bg-red-500/5 text-red-300'
+        }`}>
+          {syncResult.success
+            ? <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+            : <XCircle className="w-3.5 h-3.5 shrink-0" />
+          }
+          <span className="text-xs font-mono truncate">
+            {syncResult.success
+              ? (syncResult.stdout || 'Репозиторий актуален')
+              : (syncResult.stderr || 'Ошибка синхронизации')}
+          </span>
+        </div>
+      )}
 
       {/* Service + Env picker */}
       <div className="card mb-6">

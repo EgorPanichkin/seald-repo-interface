@@ -62,6 +62,9 @@ export const runVerify = (strict?: boolean) =>
 export const gitPull = () =>
   req<CommandResult>('/git/pull', { method: 'POST' });
 
+export const gitForcePull = () =>
+  req<CommandResult>('/git/force-pull', { method: 'POST' });
+
 export const gitStatus = () =>
   req<CommandResult & { clean: boolean; files: string[] }>('/git/status');
 
