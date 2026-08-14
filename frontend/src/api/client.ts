@@ -42,13 +42,13 @@ export const unseal = (svc: string, env: string, name?: string) =>
     body: JSON.stringify({ svc, env, name }),
   });
 
-export const seal = (svc: string, env: string, secrets: Record<string, string>) =>
+export const seal = (svc: string, env: string, secrets: Record<string, string>, modified?: string[]) =>
   req<CommandResult>('/seal', {
     method: 'POST',
-    body: JSON.stringify({ svc, env, secrets }),
+    body: JSON.stringify({ svc, env, secrets, modified }),
   });
 
-export const reseal = (svc: string, env: string, secrets: Record<string, string>, rotate?: string) =>
+export const reseal = (svc: string, env: string, secrets: Record<string, string>, rotate?: string[]) =>
   req<CommandResult>('/reseal', {
     method: 'POST',
     body: JSON.stringify({ svc, env, secrets, rotate }),

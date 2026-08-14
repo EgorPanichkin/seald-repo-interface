@@ -139,8 +139,9 @@ export default function SecretEditor() {
     setResult(null);
     const remaining = rows.filter(r => r.status !== 'deleted');
     const secrets = Object.fromEntries(remaining.map(r => [r.key, r.value]));
+    const modifiedKeys = rows.filter(r => r.status === 'modified').map(r => r.key);
     try {
-      const res = await seal(svc, env, secrets);
+      const res = await seal(svc, env, secrets, modifiedKeys.length > 0 ? modifiedKeys : undefined);
       setResult(res);
       setState(res.success ? 'saved' : 'error');
       if (res.success) {

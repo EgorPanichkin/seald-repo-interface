@@ -1,5 +1,5 @@
 import { spawn, execFile } from 'child_process';
-import { writeFileSync, unlinkSync } from 'fs';
+import { writeFileSync, unlinkSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -100,23 +100,45 @@ function writeTmp(secrets: Record<string, string>): string {
 }
 
 export async function seal(
-  cwd: string, svc: string, env: string, secrets: Record<string, string>
+  cwd: string, svc: string, env: string, secrets: Record<string, string>, modified: string[] = []
 ): Promise<CommandResult> {
+  // seal carries existing entries verbatim. To update a key's value it must be
+  // absent from the sealed file so seal re-encrypts it fresh from --from.
+  let backup: string | null = null;
+  const sealedPath = join(cwd, '.sealed', `${svc}.app.json`);
+  if (modified.length > 0 && existsSync(sealedPath)) {
+    try {
+      backup = readFileSync(sealedPath, 'utf-8');
+      const data = JSON.parse(backup);
+      for (const key of modified) {
+        if (data.envs?.[env]?.entries) delete data.envs[env].entries[key];
+      }
+      writeFileSync(sealedPath, JSON.stringify(data, null, 2));
+    } catch { backup = null; }
+  }
+
   const file = writeTmp(secrets);
   try {
-    return await run(['seal', '--svc', svc, '--env', env, '--from', file], cwd);
+    const result = await run(['seal', '--svc', svc, '--env', env, '--from', file], cwd);
+    if (!result.success && backup !== null) {
+      try { writeFileSync(sealedPath, backup); } catch { /* best-effort restore */ }
+    }
+    return result;
   } finally {
     try { unlinkSync(file); } catch { /* ignore */ }
   }
 }
 
 export async function reseal(
-  cwd: string, svc: string, env: string, secrets: Record<string, string>, rotate?: string
+  cwd: string, svc: string, env: string, secrets: Record<string, string>, rotate?: string | string[]
 ): Promise<CommandResult> {
   const file = writeTmp(secrets);
   try {
     const args = ['reseal', '--svc', svc, '--env', env, '--from', file];
-    if (rotate) args.push('--rotate', rotate);
+    if (rotate) {
+      const keys = Array.isArray(rotate) ? rotate : [rotate];
+      for (const key of keys) args.push('--rotate', key);
+    }
     return await run(args, cwd);
   } finally {
     try { unlinkSync(file); } catch { /* ignore */ }

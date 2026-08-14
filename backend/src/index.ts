@@ -190,15 +190,17 @@ app.post('/api/unseal', async (req, res) => {
 
 app.post('/api/seal', async (req, res) => {
   const { workdir } = getSettings();
-  const { svc, env, secrets } = req.body as { svc?: string; env?: string; secrets?: Record<string, string> };
+  const { svc, env, secrets, modified } = req.body as {
+    svc?: string; env?: string; secrets?: Record<string, string>; modified?: string[];
+  };
   if (!svc || !env || !secrets) return res.status(400).json({ error: 'svc, env, secrets required' });
-  res.json(await sealdctl.seal(workdir, svc, env, secrets));
+  res.json(await sealdctl.seal(workdir, svc, env, secrets, modified));
 });
 
 app.post('/api/reseal', async (req, res) => {
   const { workdir } = getSettings();
   const { svc, env, secrets, rotate } = req.body as {
-    svc?: string; env?: string; secrets?: Record<string, string>; rotate?: string;
+    svc?: string; env?: string; secrets?: Record<string, string>; rotate?: string | string[];
   };
   if (!svc || !env || !secrets) return res.status(400).json({ error: 'svc, env, secrets required' });
   res.json(await sealdctl.reseal(workdir, svc, env, secrets, rotate));
